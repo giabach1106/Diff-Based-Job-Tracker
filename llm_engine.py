@@ -42,7 +42,7 @@ class LLMEngine:
         user_prompt = (
             "Analyze this internship listing row and return strict JSON with fields: "
             "company, role, location, is_tech_intern, prestige_score, reason. "
-            "Classification: is_tech_intern=true only for SWE, Backend, Fullstack, AI/ML, DevOps, Quant. "
+            "Classification: is_tech_intern=true only for SWE, Backend, Fullstack, AI/ML, DevOps, Quant, SDE, Software Engineer, Software Development. "
             "Set false for QA, Testing, PM, Marketing and other non-engineering tracks. "
             "Scoring rubric: 95+ for FAANG/HFT/unicorn-level (e.g., Stripe/OpenAI), "
             "85+ for strong tech firms/YC-scale startups, "

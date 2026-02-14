@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     min_notify_score: int = 75
     database_path: str = "/data/jobs.db"
-    request_timeout_seconds: int = 30
+    request_timeout_seconds: int = 900
 
     model_config = SettingsConfigDict(
         env_file=".env",
