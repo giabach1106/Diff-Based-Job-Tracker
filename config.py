@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     enable_facebook: bool = False
     facebook_page_access_token: str | None = None
     facebook_page_id: str | None = None
+    facebook_graph_api_version: str = "v22.0"
 
     min_notify_score: int = 75
     database_path: str = "/data/jobs.db"

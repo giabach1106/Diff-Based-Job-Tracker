@@ -78,7 +78,7 @@ class Notifier:
         raise last_error
 
     def send_facebook(self, job: JobAnalysis, apply_link: str) -> None:
-        """Optional Facebook notifier stub (disabled by default)."""
+        """Publish one post to Facebook Page feed via Graph API."""
 
         if not self.settings.enable_facebook:
             return
@@ -87,11 +87,65 @@ class Notifier:
             LOGGER.warning("Facebook notifications enabled but credentials are incomplete; skipping.")
             return
 
-        LOGGER.info(
-            "Facebook notifications are configured as a stub in this version. "
-            "No Facebook API call is performed for %s.",
-            job.company,
+        endpoint = (
+            f"https://graph.facebook.com/"
+            f"{self.settings.facebook_graph_api_version}/"
+            f"{self.settings.facebook_page_id}/feed"
         )
+        payload = {
+            "message": self._build_facebook_message(job, apply_link),
+            "link": apply_link,
+            "access_token": self.settings.facebook_page_access_token,
+        }
+
+        retries = 3
+        last_error: Exception | None = None
+        for attempt in range(retries):
+            try:
+                response = self.session.post(
+                    endpoint,
+                    data=payload,
+                    timeout=self.settings.request_timeout_seconds,
+                )
+                if response.status_code in {429, 500, 502, 503, 504}:
+                    raise requests.HTTPError(
+                        f"Transient Facebook error: {response.status_code}",
+                        response=response,
+                    )
+
+                response_json = {}
+                try:
+                    response_json = response.json()
+                except ValueError:
+                    response_json = {}
+
+                if response.status_code >= 400:
+                    error_payload = response_json.get("error", {})
+                    if error_payload.get("is_transient"):
+                        raise requests.HTTPError(
+                            f"Transient Facebook Graph API error: {error_payload}",
+                            response=response,
+                        )
+                    raise RuntimeError(
+                        f"Facebook Graph API failed with status {response.status_code}: {response.text}"
+                    )
+
+                post_id = response_json.get("id")
+                if post_id:
+                    LOGGER.info("Facebook post published successfully: %s", post_id)
+                else:
+                    LOGGER.warning("Facebook post request succeeded but response had no post id.")
+                return
+            except (requests.Timeout, requests.ConnectionError, requests.HTTPError, RuntimeError) as exc:
+                last_error = exc
+                if attempt == retries - 1:
+                    break
+                sleep_seconds = 2**attempt
+                LOGGER.warning("Facebook send failed (%s). Retrying in %ss.", exc, sleep_seconds)
+                time.sleep(sleep_seconds)
+
+        assert last_error is not None
+        raise last_error
 
     @staticmethod
     def _discord_color(score: int) -> int:
@@ -119,3 +173,17 @@ class Notifier:
             "non_preferred": "Non-preferred (Non-USA onsite)",
         }
         return mapping.get(location_priority, "Unknown")
+
+    @staticmethod
+    def _build_facebook_message(job: JobAnalysis, apply_link: str) -> str:
+        lines = [
+            "High-quality tech internship match",
+            f"Company: {job.company}",
+            f"Role: {job.role}",
+            f"Location: {job.location or 'Unknown'}",
+            f"Score: {job.prestige_score}",
+            f"Company: {job.company_description}",
+            f"Why: {job.reason}",
+            f"Apply: {apply_link}",
+        ]
+        return "\n".join(lines)

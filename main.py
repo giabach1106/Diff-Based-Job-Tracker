@@ -79,12 +79,22 @@ def run_once() -> int:
                 continue
 
             if analysis.is_tech_intern and analysis.prestige_score >= settings.min_notify_score:
+                discord_sent = False
+                facebook_sent = False
                 try:
                     notifier.send_discord(analysis, apply_url)
-                    notifier.send_facebook(analysis, apply_url)
-                    notified = True
+                    discord_sent = True
                 except Exception:
-                    LOGGER.exception("Failed to send notification for %s", apply_url)
+                    LOGGER.exception("Failed to send Discord notification for %s", apply_url)
+
+                if settings.enable_facebook:
+                    try:
+                        notifier.send_facebook(analysis, apply_url)
+                        facebook_sent = True
+                    except Exception:
+                        LOGGER.exception("Failed to send Facebook notification for %s", apply_url)
+
+                notified = discord_sent or facebook_sent
 
             db.insert_processed_job(
                 link_hash=link_hash,
