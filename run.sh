@@ -4,10 +4,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-docker-compose down --remove-orphans
+if docker compose version >/dev/null 2>&1; then
+  compose_cmd=(docker compose)
+else
+  compose_cmd=(docker-compose)
+fi
+
+"${compose_cmd[@]}" down --remove-orphans
 set +e
-docker-compose up --build --abort-on-container-exit
+"${compose_cmd[@]}" up --build --abort-on-container-exit --exit-code-from job-tracker
 status=$?
 set -e
-docker-compose down --remove-orphans
+"${compose_cmd[@]}" down --remove-orphans
 exit "$status"
