@@ -25,8 +25,11 @@ class Settings(BaseSettings):
     facebook_graph_api_version: str = "v22.0"
     facebook_send_as_dm: bool = False
     facebook_recipient_psid: str | None = None
+    facebook_auto_use_captured_psid: bool = True
     facebook_messaging_type: str = "RESPONSE"
     facebook_message_tag: str | None = None
+    facebook_webhook_verify_token: str | None = None
+    facebook_app_secret: str | None = None
 
     min_notify_score: int = 75
     database_path: str = "/data/jobs.db"

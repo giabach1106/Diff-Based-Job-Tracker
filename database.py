@@ -44,15 +44,25 @@ class Database:
     def get_last_commit_sha(self) -> str | None:
         """Return the saved last processed commit SHA, if any."""
 
+        return self.get_state("last_commit_sha")
+
+    def set_last_commit_sha(self, sha: str) -> None:
+        """Persist the last processed commit SHA."""
+
+        self.set_state("last_commit_sha", sha)
+
+    def get_state(self, key: str) -> str | None:
+        """Get a value by key from state table."""
+
         cursor = self.conn.execute(
             "SELECT value FROM state WHERE key = ?",
-            ("last_commit_sha",),
+            (key,),
         )
         row = cursor.fetchone()
         return None if row is None else str(row["value"])
 
-    def set_last_commit_sha(self, sha: str) -> None:
-        """Persist the last processed commit SHA."""
+    def set_state(self, key: str, value: str) -> None:
+        """Upsert a key/value pair in state table."""
 
         with self.conn:
             self.conn.execute(
@@ -61,8 +71,13 @@ class Database:
                 VALUES(?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
-                ("last_commit_sha", sha),
+                (key, value),
             )
+
+    def upsert_facebook_psid(self, psid: str) -> None:
+        """Store latest captured Facebook PSID for notifications."""
+
+        self.set_state("facebook_recipient_psid", psid)
 
     def exists(self, link_hash: str) -> bool:
         """Return True when the hashed apply link was already processed."""

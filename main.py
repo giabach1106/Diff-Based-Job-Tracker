@@ -34,6 +34,13 @@ def run_once() -> int:
         db.init_schema()
         github_client = GitHubClient(settings)
         llm_engine = LLMEngine(settings)
+
+        if settings.facebook_auto_use_captured_psid and not settings.facebook_recipient_psid:
+            captured_psid = db.get_state("facebook_recipient_psid")
+            if captured_psid:
+                settings.facebook_recipient_psid = captured_psid
+                LOGGER.info("Loaded Facebook PSID from DB state.")
+
         notifier = Notifier(settings)
 
         last_sha = db.get_last_commit_sha()

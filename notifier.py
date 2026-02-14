@@ -162,11 +162,7 @@ class Notifier:
     def _send_facebook_dm(self, job: JobAnalysis, apply_link: str) -> None:
         """Send one Messenger DM from the configured Page to a PSID."""
 
-        endpoint = (
-            f"https://graph.facebook.com/"
-            f"{self.settings.facebook_graph_api_version}/"
-            f"{self.settings.facebook_page_id}/messages"
-        )
+        endpoint = f"https://graph.facebook.com/{self.settings.facebook_graph_api_version}/me/messages"
         payload: dict[str, object] = {
             "recipient": {"id": self.settings.facebook_recipient_psid},
             "messaging_type": self.settings.facebook_messaging_type,

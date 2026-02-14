@@ -10,10 +10,9 @@ else
   compose_cmd=(docker-compose)
 fi
 
-"${compose_cmd[@]}" down --remove-orphans
 set +e
-"${compose_cmd[@]}" up --build --abort-on-container-exit --exit-code-from job-tracker
+"${compose_cmd[@]}" up --build --abort-on-container-exit --exit-code-from job-tracker job-tracker
 status=$?
 set -e
-"${compose_cmd[@]}" down --remove-orphans
+"${compose_cmd[@]}" rm -f -s job-tracker >/dev/null 2>&1 || true
 exit "$status"
