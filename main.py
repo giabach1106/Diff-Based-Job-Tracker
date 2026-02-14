@@ -10,7 +10,13 @@ from database import Database
 from github_client import GitHubClient
 from llm_engine import LLMEngine
 from notifier import Notifier
-from parsing_utils import extract_apply_link, extract_company_role_location, reconstruct_added_rows
+from parsing_utils import (
+    estimate_posted_date_from_age,
+    extract_apply_link,
+    extract_company_role_location,
+    extract_posted_age,
+    reconstruct_added_rows,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -63,6 +69,8 @@ def run_once() -> int:
             apply_url = extract_apply_link(row)
             if not apply_url:
                 continue
+            posted_age = extract_posted_age(row)
+            posted_date = estimate_posted_date_from_age(posted_age)
 
             link_hash = _hash_link(apply_url)
             if db.exists(link_hash):
@@ -89,14 +97,14 @@ def run_once() -> int:
                 discord_sent = False
                 facebook_sent = False
                 try:
-                    notifier.send_discord(analysis, apply_url)
+                    notifier.send_discord(analysis, apply_url, posted_age=posted_age, posted_date=posted_date)
                     discord_sent = True
                 except Exception:
                     LOGGER.exception("Failed to send Discord notification for %s", apply_url)
 
                 if settings.enable_facebook:
                     try:
-                        notifier.send_facebook(analysis, apply_url)
+                        notifier.send_facebook(analysis, apply_url, posted_age=posted_age, posted_date=posted_date)
                         facebook_sent = True
                     except Exception:
                         LOGGER.exception("Failed to send Facebook notification for %s", apply_url)

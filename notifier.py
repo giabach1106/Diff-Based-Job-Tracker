@@ -20,7 +20,14 @@ class Notifier:
         self.settings = settings
         self.session = requests.Session()
 
-    def send_discord(self, job: JobAnalysis, apply_link: str) -> None:
+    def send_discord(
+        self,
+        job: JobAnalysis,
+        apply_link: str,
+        *,
+        posted_age: str | None = None,
+        posted_date: str | None = None,
+    ) -> None:
         """Send one Discord embed notification."""
 
         color = self._discord_color(job.prestige_score)
@@ -41,6 +48,12 @@ class Notifier:
                         {"name": "Location Fit", "value": location_fit, "inline": True},
                         {"name": "Company Tier", "value": reputation_label, "inline": True},
                         {"name": "Score", "value": f"{job.prestige_score} ({score_badge})", "inline": True},
+                        {"name": "Age", "value": (posted_age or "Unknown"), "inline": True},
+                        {
+                            "name": "Estimated Posted Date (UTC)",
+                            "value": (posted_date or "Unknown"),
+                            "inline": True,
+                        },
                         {"name": "Company Description", "value": job.company_description[:1024], "inline": False},
                         {"name": "Why This Match", "value": job.reason[:1024], "inline": False},
                         {"name": "Apply", "value": f"[Open application]({apply_link})", "inline": False},
@@ -79,7 +92,14 @@ class Notifier:
         assert last_error is not None
         raise last_error
 
-    def send_facebook(self, job: JobAnalysis, apply_link: str) -> None:
+    def send_facebook(
+        self,
+        job: JobAnalysis,
+        apply_link: str,
+        *,
+        posted_age: str | None = None,
+        posted_date: str | None = None,
+    ) -> None:
         """Send Facebook notification via Messenger DM or Page feed."""
 
         if not self.settings.enable_facebook:
@@ -93,12 +113,19 @@ class Notifier:
             if not self.settings.facebook_recipient_psid:
                 LOGGER.warning("FACEBOOK_SEND_AS_DM=true but FACEBOOK_RECIPIENT_PSID is missing; skipping.")
                 return
-            self._send_facebook_dm(job, apply_link)
+            self._send_facebook_dm(job, apply_link, posted_age=posted_age, posted_date=posted_date)
             return
 
-        self._send_facebook_page_feed(job, apply_link)
+        self._send_facebook_page_feed(job, apply_link, posted_age=posted_age, posted_date=posted_date)
 
-    def _send_facebook_page_feed(self, job: JobAnalysis, apply_link: str) -> None:
+    def _send_facebook_page_feed(
+        self,
+        job: JobAnalysis,
+        apply_link: str,
+        *,
+        posted_age: str | None = None,
+        posted_date: str | None = None,
+    ) -> None:
         """Publish one post to Facebook Page feed."""
 
         endpoint = (
@@ -107,7 +134,12 @@ class Notifier:
             f"{self.settings.facebook_page_id}/feed"
         )
         payload = {
-            "message": self._build_facebook_message(job, apply_link),
+            "message": self._build_facebook_message(
+                job,
+                apply_link,
+                posted_age=posted_age,
+                posted_date=posted_date,
+            ),
             "link": apply_link,
             "access_token": self.settings.facebook_page_access_token,
         }
@@ -161,14 +193,28 @@ class Notifier:
         assert last_error is not None
         raise last_error
 
-    def _send_facebook_dm(self, job: JobAnalysis, apply_link: str) -> None:
+    def _send_facebook_dm(
+        self,
+        job: JobAnalysis,
+        apply_link: str,
+        *,
+        posted_age: str | None = None,
+        posted_date: str | None = None,
+    ) -> None:
         """Send one Messenger DM from the configured Page to a PSID."""
 
         endpoint = f"https://graph.facebook.com/{self.settings.facebook_graph_api_version}/me/messages"
         payload: dict[str, object] = {
             "recipient": {"id": self.settings.facebook_recipient_psid},
             "messaging_type": self.settings.facebook_messaging_type,
-            "message": {"text": self._build_messenger_text(job, apply_link)},
+            "message": {
+                "text": self._build_messenger_text(
+                    job,
+                    apply_link,
+                    posted_age=posted_age,
+                    posted_date=posted_date,
+                )
+            },
         }
 
         if self.settings.facebook_messaging_type == "MESSAGE_TAG" and self.settings.facebook_message_tag:
@@ -270,7 +316,14 @@ class Notifier:
         }
         return mapping.get(company_reputation, "Unknown")
 
-    def _build_facebook_message(self, job: JobAnalysis, apply_link: str) -> str:
+    def _build_facebook_message(
+        self,
+        job: JobAnalysis,
+        apply_link: str,
+        *,
+        posted_age: str | None = None,
+        posted_date: str | None = None,
+    ) -> str:
         score_badge = self._score_badge(job.prestige_score)
         location_fit = self._location_fit_label(job.location_priority.value)
         reputation_label = self._company_reputation_label(job.company_reputation.value)
@@ -284,6 +337,9 @@ class Notifier:
             f"Location: {job.location or 'Unknown'}",
             f"Location Fit: {location_fit}",
             "",
+            f"Age: {posted_age or 'Unknown'}",
+            f"Estimated Posted Date (UTC): {posted_date or 'Unknown'}",
+            "",
             f"Company Tier: {reputation_label}",
             f"Score: {job.prestige_score}/100 ({score_badge})",
             "",
@@ -295,7 +351,14 @@ class Notifier:
         ]
         return "\n".join(lines)
 
-    def _build_messenger_text(self, job: JobAnalysis, apply_link: str) -> str:
+    def _build_messenger_text(
+        self,
+        job: JobAnalysis,
+        apply_link: str,
+        *,
+        posted_age: str | None = None,
+        posted_date: str | None = None,
+    ) -> str:
         score_badge = self._score_badge(job.prestige_score)
         location_fit = self._location_fit_label(job.location_priority.value)
         reputation_label = self._company_reputation_label(job.company_reputation.value)
@@ -307,6 +370,9 @@ class Notifier:
             "",
             f"Location: {job.location or 'Unknown'}",
             f"Location Fit: {location_fit}",
+            "",
+            f"Age: {posted_age or 'Unknown'}",
+            f"Estimated Posted Date (UTC): {posted_date or 'Unknown'}",
             "",
             f"Company Tier: {reputation_label}",
             f"Score: {job.prestige_score}/100 ({score_badge})",

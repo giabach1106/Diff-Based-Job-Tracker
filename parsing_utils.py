@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 HREF_REGEX = re.compile(r"href\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
@@ -13,6 +14,7 @@ APPLY_ANCHOR_REGEX = re.compile(
 )
 TAG_REGEX = re.compile(r"<[^>]+>")
 MARKDOWN_URL_REGEX = re.compile(r"\[(https?://[^\]]+)\]\((https?://[^)]+)\)", re.IGNORECASE)
+AGE_TOKEN_REGEX = re.compile(r"^\s*(\d+)\s*(h|d|w|mo)\s*$", re.IGNORECASE)
 
 TRACKING_QUERY_KEYS = {"fbclid", "gclid", "igshid", "ref", "source"}
 IMAGE_DOMAINS = {
@@ -104,6 +106,49 @@ def extract_company_role_location(row_html: str) -> tuple[str | None, str | None
     location = _clean_text(cells[2]) if len(cells) >= 3 else None
 
     return company or None, role or None, location or None
+
+
+def extract_posted_age(row_html: str) -> str | None:
+    """Extract relative age token from a table row (e.g. 0d, 3d, 1w, 2mo)."""
+
+    cells = re.findall(r"<td[^>]*>(.*?)</td>", row_html, flags=re.IGNORECASE | re.DOTALL)
+    if len(cells) < 5:
+        return None
+
+    age_text = _clean_text(cells[4])
+    if not age_text:
+        return None
+    if not AGE_TOKEN_REGEX.match(age_text):
+        return None
+    return age_text.lower()
+
+
+def estimate_posted_date_from_age(age_token: str | None) -> str | None:
+    """Convert an age token into an approximate UTC posting date (YYYY-MM-DD)."""
+
+    if not age_token:
+        return None
+
+    match = AGE_TOKEN_REGEX.match(age_token)
+    if not match:
+        return None
+
+    amount = int(match.group(1))
+    unit = match.group(2).lower()
+    now = datetime.now(timezone.utc)
+
+    if unit == "h":
+        posted = now - timedelta(hours=amount)
+    elif unit == "d":
+        posted = now - timedelta(days=amount)
+    elif unit == "w":
+        posted = now - timedelta(weeks=amount)
+    elif unit == "mo":
+        posted = now - timedelta(days=amount * 30)
+    else:
+        return None
+
+    return posted.date().isoformat()
 
 
 def _normalize_candidate_url(raw_url: str) -> str | None:
