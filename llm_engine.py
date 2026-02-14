@@ -24,6 +24,15 @@ class LocationPriority(str, Enum):
     NON_PREFERRED = "non_preferred"
 
 
+class CompanyReputation(str, Enum):
+    """Company reputation tier used for non-tech override decisions."""
+
+    ELITE = "elite"
+    STRONG = "strong"
+    STANDARD = "standard"
+    UNKNOWN = "unknown"
+
+
 class JobAnalysis(BaseModel):
     """Structured output from LLM job analysis."""
 
@@ -36,6 +45,7 @@ class JobAnalysis(BaseModel):
     is_tech_intern: bool
     prestige_score: int = Field(ge=0, le=100)
     location_priority: LocationPriority = LocationPriority.NEUTRAL
+    company_reputation: CompanyReputation = CompanyReputation.UNKNOWN
     reason: str
 
     @field_validator("location_priority", mode="before")
@@ -53,6 +63,21 @@ class JobAnalysis(BaseModel):
                 ) from exc
         raise TypeError("location_priority must be a LocationPriority enum or valid string")
 
+    @field_validator("company_reputation", mode="before")
+    @classmethod
+    def _normalize_company_reputation(cls, value: Any) -> CompanyReputation:
+        if isinstance(value, CompanyReputation):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            try:
+                return CompanyReputation(normalized)
+            except ValueError as exc:
+                raise ValueError(
+                    "company_reputation must be one of: elite, strong, standard, unknown"
+                ) from exc
+        raise TypeError("company_reputation must be a CompanyReputation enum or valid string")
+
 
 class LLMEngine:
     """Wrapper around OpenAI for row-level job analysis."""
@@ -69,10 +94,14 @@ class LLMEngine:
         user_prompt = (
             "Analyze this internship listing row and return strict JSON with fields: "
             "company, role, location, company_description, is_tech_intern, prestige_score, "
-            "location_priority, reason. "
+            "location_priority, company_reputation, reason. "
             "company_description must be one sentence describing the company's industry and product focus. "
             "Classification: is_tech_intern=true only for SWE, Backend, Fullstack, AI/ML, DevOps, Quant, SDE, Software Engineer, Software Development. "
             "Set false for QA, Testing, PM, Marketing and other non-engineering tracks. "
+            "Company reputation tier (independent from role): "
+            "elite for FAANG/HFT/top-10 global leaders in their domain, "
+            "strong for widely respected large tech/product companies, "
+            "standard for normal companies, unknown when unclear. "
             "Scoring rubric baseline: 95+ for FAANG/HFT/unicorn-level (e.g., Stripe/OpenAI), "
             "85+ for strong tech firms/YC-scale startups, "
             "75+ for banks or major non-tech firms with engineering programs, "

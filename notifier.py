@@ -26,6 +26,7 @@ class Notifier:
         color = self._discord_color(job.prestige_score)
         location_fit = self._location_fit_label(job.location_priority.value)
         score_badge = self._score_badge(job.prestige_score)
+        reputation_label = self._company_reputation_label(job.company_reputation.value)
         payload = {
             "embeds": [
                 {
@@ -38,6 +39,7 @@ class Notifier:
                         {"name": "Role", "value": job.role[:1024], "inline": True},
                         {"name": "Location", "value": (job.location or "Unknown")[:1024], "inline": True},
                         {"name": "Location Fit", "value": location_fit, "inline": True},
+                        {"name": "Company Tier", "value": reputation_label, "inline": True},
                         {"name": "Score", "value": f"{job.prestige_score} ({score_badge})", "inline": True},
                         {"name": "Company Description", "value": job.company_description[:1024], "inline": False},
                         {"name": "Why This Match", "value": job.reason[:1024], "inline": False},
@@ -259,26 +261,46 @@ class Notifier:
         return mapping.get(location_priority, "Unknown")
 
     @staticmethod
-    def _build_facebook_message(job: JobAnalysis, apply_link: str) -> str:
+    def _company_reputation_label(company_reputation: str) -> str:
+        mapping = {
+            "elite": "Elite",
+            "strong": "Strong",
+            "standard": "Standard",
+            "unknown": "Unknown",
+        }
+        return mapping.get(company_reputation, "Unknown")
+
+    def _build_facebook_message(self, job: JobAnalysis, apply_link: str) -> str:
+        score_badge = self._score_badge(job.prestige_score)
+        location_fit = self._location_fit_label(job.location_priority.value)
+        reputation_label = self._company_reputation_label(job.company_reputation.value)
         lines = [
-            "High-quality tech internship match",
+            "[INTERNSHIP RADAR]",
+            "--------------------",
             f"Company: {job.company}",
             f"Role: {job.role}",
             f"Location: {job.location or 'Unknown'}",
-            f"Score: {job.prestige_score}",
-            f"Company: {job.company_description}",
-            f"Why: {job.reason}",
-            f"Apply: {apply_link}",
+            f"Location Fit: {location_fit}",
+            f"Company Tier: {reputation_label}",
+            f"Score: {job.prestige_score}/100 ({score_badge})",
+            f"Why it matched: {job.reason}",
+            f"Company snapshot: {job.company_description}",
+            f"Apply now: {apply_link}",
         ]
         return "\n".join(lines)
 
-    @staticmethod
-    def _build_messenger_text(job: JobAnalysis, apply_link: str) -> str:
+    def _build_messenger_text(self, job: JobAnalysis, apply_link: str) -> str:
+        score_badge = self._score_badge(job.prestige_score)
+        location_fit = self._location_fit_label(job.location_priority.value)
+        reputation_label = self._company_reputation_label(job.company_reputation.value)
         lines = [
-            "Internship Alert",
+            "[INTERNSHIP ALERT]",
+            "====================",
             f"{job.company} - {job.role}",
             f"Location: {job.location or 'Unknown'}",
-            f"Score: {job.prestige_score}",
+            f"Location Fit: {location_fit}",
+            f"Company Tier: {reputation_label}",
+            f"Score: {job.prestige_score}/100 ({score_badge})",
             f"Why: {job.reason}",
             f"Apply: {apply_link}",
         ]

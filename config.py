@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     facebook_app_secret: str | None = None
 
     min_notify_score: int = 75
+    allow_top_company_override: bool = True
+    top_company_override_min_score: int = 75
     database_path: str = "/data/jobs.db"
     request_timeout_seconds: int = 30
 
