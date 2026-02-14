@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     facebook_page_access_token: str | None = None
     facebook_page_id: str | None = None
     facebook_graph_api_version: str = "v22.0"
+    facebook_send_as_dm: bool = False
+    facebook_recipient_psid: str | None = None
+    facebook_messaging_type: str = "RESPONSE"
+    facebook_message_tag: str | None = None
 
     min_notify_score: int = 75
     database_path: str = "/data/jobs.db"

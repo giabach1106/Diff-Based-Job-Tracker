@@ -78,7 +78,7 @@ class Notifier:
         raise last_error
 
     def send_facebook(self, job: JobAnalysis, apply_link: str) -> None:
-        """Publish one post to Facebook Page feed via Graph API."""
+        """Send Facebook notification via Messenger DM or Page feed."""
 
         if not self.settings.enable_facebook:
             return
@@ -86,6 +86,18 @@ class Notifier:
         if not self.settings.facebook_page_access_token or not self.settings.facebook_page_id:
             LOGGER.warning("Facebook notifications enabled but credentials are incomplete; skipping.")
             return
+
+        if self.settings.facebook_send_as_dm:
+            if not self.settings.facebook_recipient_psid:
+                LOGGER.warning("FACEBOOK_SEND_AS_DM=true but FACEBOOK_RECIPIENT_PSID is missing; skipping.")
+                return
+            self._send_facebook_dm(job, apply_link)
+            return
+
+        self._send_facebook_page_feed(job, apply_link)
+
+    def _send_facebook_page_feed(self, job: JobAnalysis, apply_link: str) -> None:
+        """Publish one post to Facebook Page feed."""
 
         endpoint = (
             f"https://graph.facebook.com/"
@@ -147,6 +159,82 @@ class Notifier:
         assert last_error is not None
         raise last_error
 
+    def _send_facebook_dm(self, job: JobAnalysis, apply_link: str) -> None:
+        """Send one Messenger DM from the configured Page to a PSID."""
+
+        endpoint = (
+            f"https://graph.facebook.com/"
+            f"{self.settings.facebook_graph_api_version}/"
+            f"{self.settings.facebook_page_id}/messages"
+        )
+        payload: dict[str, object] = {
+            "recipient": {"id": self.settings.facebook_recipient_psid},
+            "messaging_type": self.settings.facebook_messaging_type,
+            "message": {"text": self._build_messenger_text(job, apply_link)},
+        }
+
+        if self.settings.facebook_messaging_type == "MESSAGE_TAG" and self.settings.facebook_message_tag:
+            payload["tag"] = self.settings.facebook_message_tag
+
+        retries = 3
+        last_error: Exception | None = None
+        for attempt in range(retries):
+            try:
+                response = self.session.post(
+                    endpoint,
+                    params={"access_token": self.settings.facebook_page_access_token},
+                    json=payload,
+                    timeout=self.settings.request_timeout_seconds,
+                )
+
+                if response.status_code in {429, 500, 502, 503, 504}:
+                    raise requests.HTTPError(
+                        f"Transient Messenger error: {response.status_code}",
+                        response=response,
+                    )
+
+                response_json = {}
+                try:
+                    response_json = response.json()
+                except ValueError:
+                    response_json = {}
+
+                if response.status_code >= 400:
+                    error_payload = response_json.get("error", {})
+                    if error_payload.get("is_transient"):
+                        raise requests.HTTPError(
+                            f"Transient Messenger Graph API error: {error_payload}",
+                            response=response,
+                        )
+                    error_code = error_payload.get("code")
+                    error_message = error_payload.get("message", response.text)
+                    if error_code == 10:
+                        raise RuntimeError(
+                            "Messenger permission/window restriction. "
+                            "Ensure user messaged the Page and app has required Messenger permissions. "
+                            f"Graph error: {error_message}"
+                        )
+                    raise RuntimeError(
+                        f"Messenger Graph API failed with status {response.status_code}: {response.text}"
+                    )
+
+                message_id = response_json.get("message_id")
+                if message_id:
+                    LOGGER.info("Facebook Messenger DM sent successfully: %s", message_id)
+                else:
+                    LOGGER.warning("Messenger send succeeded but response had no message_id.")
+                return
+            except (requests.Timeout, requests.ConnectionError, requests.HTTPError, RuntimeError) as exc:
+                last_error = exc
+                if attempt == retries - 1:
+                    break
+                sleep_seconds = 2**attempt
+                LOGGER.warning("Messenger send failed (%s). Retrying in %ss.", exc, sleep_seconds)
+                time.sleep(sleep_seconds)
+
+        assert last_error is not None
+        raise last_error
+
     @staticmethod
     def _discord_color(score: int) -> int:
         if score > 85:
@@ -183,6 +271,18 @@ class Notifier:
             f"Location: {job.location or 'Unknown'}",
             f"Score: {job.prestige_score}",
             f"Company: {job.company_description}",
+            f"Why: {job.reason}",
+            f"Apply: {apply_link}",
+        ]
+        return "\n".join(lines)
+
+    @staticmethod
+    def _build_messenger_text(job: JobAnalysis, apply_link: str) -> str:
+        lines = [
+            "Internship Alert",
+            f"{job.company} - {job.role}",
+            f"Location: {job.location or 'Unknown'}",
+            f"Score: {job.prestige_score}",
             f"Why: {job.reason}",
             f"Apply: {apply_link}",
         ]

@@ -6,9 +6,10 @@ import json
 import logging
 import time
 from enum import Enum
+from typing import Any
 
 from openai import APIConnectionError, APITimeoutError, InternalServerError, OpenAI, RateLimitError
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from config import Settings
 
@@ -36,6 +37,21 @@ class JobAnalysis(BaseModel):
     prestige_score: int = Field(ge=0, le=100)
     location_priority: LocationPriority = LocationPriority.NEUTRAL
     reason: str
+
+    @field_validator("location_priority", mode="before")
+    @classmethod
+    def _normalize_location_priority(cls, value: Any) -> LocationPriority:
+        if isinstance(value, LocationPriority):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            try:
+                return LocationPriority(normalized)
+            except ValueError as exc:
+                raise ValueError(
+                    "location_priority must be one of: preferred, neutral, non_preferred"
+                ) from exc
+        raise TypeError("location_priority must be a LocationPriority enum or valid string")
 
 
 class LLMEngine:
