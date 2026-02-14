@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from enum import Enum
 
 from openai import APIConnectionError, APITimeoutError, InternalServerError, OpenAI, RateLimitError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -12,6 +13,14 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from config import Settings
 
 LOGGER = logging.getLogger(__name__)
+
+
+class LocationPriority(str, Enum):
+    """Location preference level for notification quality."""
+
+    PREFERRED = "preferred"
+    NEUTRAL = "neutral"
+    NON_PREFERRED = "non_preferred"
 
 
 class JobAnalysis(BaseModel):
@@ -22,8 +31,10 @@ class JobAnalysis(BaseModel):
     company: str
     role: str
     location: str
+    company_description: str = "No company description provided."
     is_tech_intern: bool
     prestige_score: int = Field(ge=0, le=100)
+    location_priority: LocationPriority = LocationPriority.NEUTRAL
     reason: str
 
 
@@ -41,14 +52,21 @@ class LLMEngine:
 
         user_prompt = (
             "Analyze this internship listing row and return strict JSON with fields: "
-            "company, role, location, is_tech_intern, prestige_score, reason. "
+            "company, role, location, company_description, is_tech_intern, prestige_score, "
+            "location_priority, reason. "
+            "company_description must be one sentence describing the company's industry and product focus. "
             "Classification: is_tech_intern=true only for SWE, Backend, Fullstack, AI/ML, DevOps, Quant, SDE, Software Engineer, Software Development. "
             "Set false for QA, Testing, PM, Marketing and other non-engineering tracks. "
-            "Scoring rubric: 95+ for FAANG/HFT/unicorn-level (e.g., Stripe/OpenAI), "
+            "Scoring rubric baseline: 95+ for FAANG/HFT/unicorn-level (e.g., Stripe/OpenAI), "
             "85+ for strong tech firms/YC-scale startups, "
             "75+ for banks or major non-tech firms with engineering programs, "
             "below 70 for unknown or low relevance. "
-            "Use concise reason text."
+            "Location priority rule: set location_priority='preferred' for USA or fully Remote roles; "
+            "set location_priority='neutral' for hybrid or unclear location; "
+            "set location_priority='non_preferred' for clearly non-USA onsite roles. "
+            "Apply a location weighting to prestige_score after baseline: preferred +8, neutral +0, non_preferred -8, "
+            "and clamp between 0 and 100. "
+            "reason must be concise and mention both company quality and location priority impact."
             f"\n\nRaw row:\n{raw_html}"
         )
 

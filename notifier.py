@@ -24,19 +24,24 @@ class Notifier:
         """Send one Discord embed notification."""
 
         color = self._discord_color(job.prestige_score)
+        location_fit = self._location_fit_label(job.location_priority.value)
+        score_badge = self._score_badge(job.prestige_score)
         payload = {
             "embeds": [
                 {
                     "title": f"{job.company} - {job.role}",
                     "url": apply_link,
-                    "description": "High-quality internship detected.",
+                    "description": "High-quality tech internship match detected.",
                     "color": color,
                     "fields": [
-                        {"name": "Company", "value": job.company, "inline": True},
-                        {"name": "Role", "value": job.role, "inline": True},
-                        {"name": "Location", "value": job.location or "Unknown", "inline": True},
-                        {"name": "Score", "value": str(job.prestige_score), "inline": True},
-                        {"name": "Reason", "value": job.reason[:1000], "inline": False},
+                        {"name": "Company", "value": job.company[:1024], "inline": True},
+                        {"name": "Role", "value": job.role[:1024], "inline": True},
+                        {"name": "Location", "value": (job.location or "Unknown")[:1024], "inline": True},
+                        {"name": "Location Fit", "value": location_fit, "inline": True},
+                        {"name": "Score", "value": f"{job.prestige_score} ({score_badge})", "inline": True},
+                        {"name": "Company Description", "value": job.company_description[:1024], "inline": False},
+                        {"name": "Why This Match", "value": job.reason[:1024], "inline": False},
+                        {"name": "Apply", "value": f"[Open application]({apply_link})", "inline": False},
                     ],
                 }
             ]
@@ -95,3 +100,22 @@ class Notifier:
         if score > 75:
             return 0xF1C40F  # Yellow
         return 0x95A5A6  # Neutral
+
+    @staticmethod
+    def _score_badge(score: int) -> str:
+        if score >= 95:
+            return "Elite"
+        if score >= 85:
+            return "Strong"
+        if score >= 75:
+            return "Good"
+        return "Low"
+
+    @staticmethod
+    def _location_fit_label(location_priority: str) -> str:
+        mapping = {
+            "preferred": "Preferred (USA/Remote)",
+            "neutral": "Neutral (Hybrid/Unknown)",
+            "non_preferred": "Non-preferred (Non-USA onsite)",
+        }
+        return mapping.get(location_priority, "Unknown")
