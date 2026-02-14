@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  job-tracker:
+    build: .
+    container_name: diff-job-tracker
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
+    restart: "no"
