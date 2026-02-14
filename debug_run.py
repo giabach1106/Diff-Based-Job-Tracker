@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from config import get_settings
 from database import Database
 from github_client import GitHubClient
-from llm_engine import CompanyReputation, LLMEngine
+from llm_engine import LLMEngine
 from notifier import Notifier
 from parsing_utils import extract_apply_link, extract_company_role_location, reconstruct_added_rows
 
@@ -25,9 +25,7 @@ class Counters:
     llm_failed: int = 0
     skipped_not_tech: int = 0
     skipped_low_score: int = 0
-    skipped_not_top_company: int = 0
     eligible: int = 0
-    eligible_top_company_override: int = 0
     discord_ok: int = 0
     discord_failed: int = 0
     facebook_ok: int = 0
@@ -36,10 +34,6 @@ class Counters:
 
 def _hash_link(link: str) -> str:
     return hashlib.sha256(link.encode("utf-8")).hexdigest()
-
-
-def _is_top_company_reputation(reputation: CompanyReputation) -> bool:
-    return reputation in {CompanyReputation.ELITE, CompanyReputation.STRONG}
 
 
 def _parse_args() -> argparse.Namespace:
@@ -84,10 +78,6 @@ def main() -> int:
         print(f"old_sha={old_sha}")
         print(f"new_sha={new_sha}")
         print(f"min_notify_score={settings.min_notify_score}")
-        print(
-            "top_company_override="
-            f"{settings.allow_top_company_override}, min_score={settings.top_company_override_min_score}"
-        )
         print(f"enable_facebook={settings.enable_facebook}, facebook_send_as_dm={settings.facebook_send_as_dm}")
         print(f"send_mode={'ON' if args.send else 'OFF (dry-run)'}")
         print()
@@ -125,31 +115,13 @@ def main() -> int:
                 )
                 continue
 
-            meets_tech_rule = analysis.is_tech_intern and analysis.prestige_score >= settings.min_notify_score
-            is_top_company = _is_top_company_reputation(analysis.company_reputation)
-            meets_reputation_override = (
-                settings.allow_top_company_override
-                and is_top_company
-                and analysis.prestige_score >= settings.top_company_override_min_score
-            )
-
             reasons: list[str] = []
-            if not (meets_tech_rule or meets_reputation_override):
-                if not analysis.is_tech_intern:
-                    counters.skipped_not_tech += 1
-                    reasons.append("not_tech")
-                    if settings.allow_top_company_override:
-                        if not is_top_company:
-                            counters.skipped_not_top_company += 1
-                            reasons.append("company_tier_not_top")
-                        elif analysis.prestige_score < settings.top_company_override_min_score:
-                            counters.skipped_low_score += 1
-                            reasons.append(
-                                f"score<{settings.top_company_override_min_score}_for_top_company"
-                            )
-                if analysis.is_tech_intern and analysis.prestige_score < settings.min_notify_score:
-                    counters.skipped_low_score += 1
-                    reasons.append(f"score<{settings.min_notify_score}")
+            if not analysis.is_tech_intern:
+                counters.skipped_not_tech += 1
+                reasons.append("not_tech")
+            if analysis.prestige_score < settings.min_notify_score:
+                counters.skipped_low_score += 1
+                reasons.append(f"score<{settings.min_notify_score}")
 
             company = analysis.company or fallback_company or "Unknown"
             role = analysis.role or fallback_role or "Unknown"
@@ -164,15 +136,11 @@ def main() -> int:
                 continue
 
             counters.eligible += 1
-            if not analysis.is_tech_intern and meets_reputation_override:
-                counters.eligible_top_company_override += 1
             print(
                 f"[{idx}] ELIGIBLE company={company} role={role} score={analysis.prestige_score} "
                 f"tech={analysis.is_tech_intern} reputation={analysis.company_reputation.value} "
                 f"location={location}"
             )
-            if not meets_tech_rule and meets_reputation_override:
-                print("      reason=top_company_override")
             print(f"      apply={apply_link}")
 
             if not args.send:
@@ -202,9 +170,7 @@ def main() -> int:
         print(f"llm_failed={counters.llm_failed}")
         print(f"skipped_not_tech={counters.skipped_not_tech}")
         print(f"skipped_low_score={counters.skipped_low_score}")
-        print(f"skipped_not_top_company={counters.skipped_not_top_company}")
         print(f"eligible={counters.eligible}")
-        print(f"eligible_top_company_override={counters.eligible_top_company_override}")
         print(f"discord_ok={counters.discord_ok}")
         print(f"discord_failed={counters.discord_failed}")
         print(f"facebook_ok={counters.facebook_ok}")

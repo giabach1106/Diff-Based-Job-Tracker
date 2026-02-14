@@ -8,7 +8,7 @@ import logging
 from config import get_settings
 from database import Database
 from github_client import GitHubClient
-from llm_engine import CompanyReputation, LLMEngine
+from llm_engine import LLMEngine
 from notifier import Notifier
 from parsing_utils import extract_apply_link, extract_company_role_location, reconstruct_added_rows
 
@@ -17,10 +17,6 @@ LOGGER = logging.getLogger(__name__)
 
 def _hash_link(link: str) -> str:
     return hashlib.sha256(link.encode("utf-8")).hexdigest()
-
-
-def _is_top_company_reputation(reputation: CompanyReputation) -> bool:
-    return reputation in {CompanyReputation.ELITE, CompanyReputation.STRONG}
 
 
 def run_once() -> int:
@@ -89,14 +85,7 @@ def run_once() -> int:
                 )
                 continue
 
-            meets_tech_rule = analysis.is_tech_intern and analysis.prestige_score >= settings.min_notify_score
-            meets_reputation_override = (
-                settings.allow_top_company_override
-                and _is_top_company_reputation(analysis.company_reputation)
-                and analysis.prestige_score >= settings.top_company_override_min_score
-            )
-
-            if meets_tech_rule or meets_reputation_override:
+            if analysis.is_tech_intern and analysis.prestige_score >= settings.min_notify_score:
                 discord_sent = False
                 facebook_sent = False
                 try:

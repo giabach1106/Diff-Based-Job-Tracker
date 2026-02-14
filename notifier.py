@@ -277,14 +277,20 @@ class Notifier:
         lines = [
             "[INTERNSHIP RADAR]",
             "--------------------",
+            "",
             f"Company: {job.company}",
             f"Role: {job.role}",
+            "",
             f"Location: {job.location or 'Unknown'}",
             f"Location Fit: {location_fit}",
+            "",
             f"Company Tier: {reputation_label}",
             f"Score: {job.prestige_score}/100 ({score_badge})",
+            "",
             f"Why it matched: {job.reason}",
+            "",
             f"Company snapshot: {job.company_description}",
+            "",
             f"Apply now: {apply_link}",
         ]
         return "\n".join(lines)
@@ -296,12 +302,17 @@ class Notifier:
         lines = [
             "[INTERNSHIP ALERT]",
             "====================",
+            "",
             f"{job.company} - {job.role}",
+            "",
             f"Location: {job.location or 'Unknown'}",
             f"Location Fit: {location_fit}",
+            "",
             f"Company Tier: {reputation_label}",
             f"Score: {job.prestige_score}/100 ({score_badge})",
+            "",
             f"Why: {job.reason}",
+            "",
             f"Apply: {apply_link}",
         ]
         return "\n".join(lines)
