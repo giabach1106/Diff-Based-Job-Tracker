@@ -8,11 +8,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Runtime settings loaded from environment variables."""
 
+    source_type: str = "github"
+
     github_owner: str = "SimplifyJobs"
     github_repo: str = "Summer2026-Internships"
-    github_branch: str
+    github_branch: str = "main"
     github_token: str | None = None
     github_target_file: str = "README.md"
+
+    airtable_pat: str | None = None
+    airtable_base_id: str | None = None
+    airtable_table_id: str | None = None
+    airtable_view: str | None = None
+    airtable_shared_view_url: str | None = None
+    airtable_company_field: str = "Company"
+    airtable_role_field: str = "Position Title"
+    airtable_location_field: str = "Location"
+    airtable_apply_field: str = "Apply"
+    airtable_date_field: str = "Date"
 
     openai_api_key: str
     openai_model: str = "gpt-4o-mini"
