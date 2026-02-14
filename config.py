@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     github_owner: str = "SimplifyJobs"
     github_repo: str = "Summer2026-Internships"
-    github_branch: str = "main"
+    github_branch: str
     github_token: str | None = None
     github_target_file: str = "README.md"
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     min_notify_score: int = 75
     database_path: str = "/data/jobs.db"
-    request_timeout_seconds: int = 900
+    request_timeout_seconds: int = 30
 
     model_config = SettingsConfigDict(
         env_file=".env",
